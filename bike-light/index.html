@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Bike Light</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* One-screen control panel; deliberately dark-only (it's a light tool used in the dark) */
+:root{
+  --bg:#0e0b0c; --panel:#1a1416; --line:#3a2a2e; --fg:#f3e9ea; --muted:#a8969a;
+  --red:#ff1a1a; --warn:#ffb347; --ok:#7bd88f;
+  --display:"Archivo Black","Arial Black",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;margin:0}
+.wrap{max-width:30rem;margin:0 auto;padding-inline:16px;padding-block:24px 32px;display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--display);font-size:2rem;margin:0;letter-spacing:.01em;text-wrap:balance}
+h1 span{color:var(--red)}
+.sub{color:var(--muted);margin:0;line-height:1.5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px}
+label{font-weight:500}
+.rate{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:1.25rem}
+input[type=range]{width:100%;accent-color:var(--red)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--bg);border-radius:10px;padding:4px}
+.seg button{background:none;border:0;color:var(--muted);font:inherit;padding:10px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--line);color:var(--fg)}
+.toggle{display:flex;align-items:center;gap:10px}
+.toggle input{width:22px;height:22px;accent-color:var(--red)}
+.go{font-family:var(--display);font-size:1.4rem;letter-spacing:.04em;background:var(--red);color:#fff;border:0;border-radius:12px;padding:18px;cursor:pointer}
+.go:focus-visible,.seg button:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.status{font-family:var(--mono);font-size:.85rem;color:var(--muted);line-height:1.5;min-height:1.5em}
+.status.ok{color:var(--ok)} .status.warn{color:var(--warn)}
+.note{font-size:.85rem;color:var(--muted);line-height:1.5;margin:0}
+.note strong{color:var(--warn)}
+#stage{position:fixed;inset:0;background:#000;display:flex;align-items:flex-end;justify-content:center;z-index:10;cursor:pointer}
+#stage.on{background:var(--red)}
+#stage p{color:rgba(255,255,255,.55);font-family:var(--mono);font-size:.8rem;margin:0 0 calc(24px + env(safe-area-inset-bottom,0px))}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Bike <span>Light</span></h1>
+    <p class="sub">Flashes your phone's torch and screen together. Chrome on Android.</p>
+  </header>
+
+  <section class="card">
+    <div class="row"><label for="rate">Flash rate</label><span class="rate" id="rateOut">2.0 Hz</span></div>
+    <input id="rate" type="range" min="0.5" max="3" step="0.5" value="2">
+    <div class="ticks"><span>0.5</span><span>1</span><span>1.5</span><span>2</span><span>2.5</span><span>3 Hz</span></div>
+
+    <div>
+      <label style="display:block;margin-bottom:8px">Pattern</label>
+      <div class="seg" role="group">
+        <button id="modeSync" aria-pressed="true">Together</button>
+        <button id="modeAlt" aria-pressed="false">Alternate</button>
+      </div>
+    </div>
+
+    <div class="toggle"><input id="useTorch" type="checkbox" checked><label for="useTorch">Torch</label></div>
+    <div class="toggle"><input id="useScreen" type="checkbox" checked><label for="useScreen">Red screen</label></div>
+  </section>
+
+  <button class="go" id="go">START</button>
+  <div class="status" id="status" role="status">Torch not started yet.</div>
+
+  <p class="note"><strong>Photosensitivity:</strong> the rate is capped at 3 flashes per second, the usual seizure-safety limit. Don't use it around anyone who may be photosensitive.</p>
+</div>
+
+<div id="stage" hidden><p>Tap anywhere to stop</p></div>
+
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const rate=$('rate'), rateOut=$('rateOut'), stage=$('stage'), status=$('status');
+  let mode='sync', track=null, timer=null, phase=false, wake=null, torchOK=false;
+
+  const setStatus=(t,c)=>{status.textContent=t;status.className='status'+(c?' '+c:'');};
+  rate.addEventListener('input',()=>{rateOut.textContent=(+rate.value).toFixed(1)+' Hz'; if(timer){stopLoop();startLoop();}});
+  function setMode(m){mode=m;$('modeSync').setAttribute('aria-pressed',m==='sync');$('modeAlt').setAttribute('aria-pressed',m==='alt');}
+  $('modeSync').onclick=()=>setMode('sync'); $('modeAlt').onclick=()=>setMode('alt');
+
+  async function getTorch(){
+    if(track) return true;
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){setStatus('This browser can\'t open the camera, so the torch is off. Screen still flashes.','warn');return false;}
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}});
+      const t=s.getVideoTracks()[0];
+      const caps=t.getCapabilities?t.getCapabilities():{};
+      if(!caps.torch){t.stop();setStatus('Camera opened, but this phone/browser doesn\'t expose the torch. Screen still flashes.','warn');return false;}
+      track=t; setStatus('Torch ready.','ok'); return true;
+    }catch(e){
+      setStatus('Camera access was refused ('+(e.name||'error')+'). If you denied the prompt, allow the camera in Chrome\'s site settings. Embedded pages (like Claude artifacts) can\'t use the camera at all. Screen still flashes.','warn');
+      return false;
+    }
+  }
+  function torch(on){ if(track) track.applyConstraints({advanced:[{torch:on}]}).catch(()=>{}); }
+
+  function tick(){
+    phase=!phase;
+    const screenOn = mode==='sync'?phase:!phase;
+    if($('useScreen').checked) stage.classList.toggle('on',screenOn); else stage.classList.remove('on');
+    if($('useTorch').checked && torchOK) torch(phase);
+  }
+  function startLoop(){ const half=500/(+rate.value); tick(); timer=setInterval(tick,half); }
+  function stopLoop(){ clearInterval(timer); timer=null; }
+
+  async function start(){
+    torchOK = $('useTorch').checked ? await getTorch() : false;
+    stage.hidden=false; phase=false; startLoop();
+    try{ wake = await navigator.wakeLock.request('screen'); }catch(e){}
+    try{ if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen(); }catch(e){}
+  }
+  function stop(){
+    stopLoop(); torch(false); stage.classList.remove('on'); stage.hidden=true;
+    try{ wake&&wake.release(); }catch(e){} wake=null;
+    try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  }
+  $('go').onclick=start;
+  stage.onclick=stop;
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden && timer) stop(); });
+})();
+</script>
+
+</body></html>
