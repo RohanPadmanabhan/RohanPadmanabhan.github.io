@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hot Potato</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1c120c">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* One-screen pass-the-phone game; dark warm palette, deliberately single theme */
+:root{
+  --bg:#1c120c; --panel:#2a1b12; --line:#4a3022; --fg:#fbefe4; --muted:#c3a58f;
+  --hot:#ff6a1a; --hot2:#ffb21a; --boom:#e01b1b;
+  --display:"Archivo Black","Arial Black",system-ui,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+.screen{min-height:100%;max-width:30rem;margin:0 auto;padding-inline:16px;padding-block:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:20px}
+h1{font-family:var(--display);font-size:2.4rem;line-height:1.05;margin:0;text-wrap:balance}
+h1 span{color:var(--hot)}
+.sub{color:var(--muted);margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.label{font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);border-radius:10px;padding:4px}
+.seg button{background:none;border:0;color:var(--muted);font:inherit;padding:10px 4px;border-radius:8px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--line);color:var(--fg)}
+.toggle{display:flex;align-items:center;gap:10px}
+.toggle input{width:22px;height:22px;accent-color:var(--hot)}
+ol{margin:0;padding-left:1.2em;color:var(--muted)}
+ol li+li{margin-top:4px}
+.btn{font-family:var(--display);font-size:1.3rem;letter-spacing:.03em;border:0;border-radius:14px;padding:18px;cursor:pointer;background:var(--hot);color:#1c120c}
+.btn.ghost{background:none;border:1px solid var(--line);color:var(--fg);font-family:var(--body);font-size:1rem;font-weight:500;padding:14px}
+.btn:focus-visible,.seg button:focus-visible,input:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+
+/* Play screen */
+#play{justify-content:center;text-align:center;transition:background-color .4s}
+#play .label{color:var(--muted)}
+.category{font-family:var(--display);font-size:clamp(2rem,9vw,3rem);line-height:1.1;text-wrap:balance;margin:0}
+.letter{font-family:var(--mono);font-size:1.1rem;color:var(--hot2);min-height:1.5em}
+.potato{width:min(55vw,220px);aspect-ratio:1;margin:8px auto;max-width:100%}
+.potato.wobble{animation:wob var(--speed,.6s) ease-in-out infinite}
+@keyframes wob{0%,100%{transform:rotate(-6deg) scale(1)}50%{transform:rotate(6deg) scale(1.04)}}
+.hint{color:var(--muted);margin:0}
+.row{display:flex;gap:10px}
+.row .btn{flex:1}
+
+/* Boom screen */
+#boom{justify-content:center;text-align:center;background:var(--boom);max-width:none}
+#boom > *{max-width:30rem;width:100%;margin-inline:auto}
+#boom h2{font-family:var(--display);font-size:clamp(3.5rem,18vw,6rem);margin:0;line-height:1}
+#boom p{margin:0;font-size:1.15rem}
+#boom .btn{background:var(--fg);color:var(--boom)}
+#boom .btn.ghost{background:none;color:var(--fg);border-color:rgba(255,255,255,.5)}
+.shake{animation:shake .5s}
+@keyframes shake{10%,90%{transform:translateX(-4px)}20%,80%{transform:translateX(8px)}30%,50%,70%{transform:translateX(-12px)}40%,60%{transform:translateX(12px)}}
+@media (prefers-reduced-motion:reduce){.potato.wobble,.shake{animation:none}}
+</style>
+</head>
+<body>
+
+<section class="screen" id="setup">
+  <header>
+    <h1>Hot <span>Potato</span></h1>
+    <p class="sub">A pass-the-phone party game for 3 or more.</p>
+  </header>
+
+  <div class="card">
+    <span class="label">How to play</span>
+    <ol>
+      <li>A category appears. Whoever holds the phone names something in it, then passes it on.</li>
+      <li>No repeats, and no passing until you've said something.</li>
+      <li>A hidden timer ticks down. Whoever is holding the phone when it explodes loses the round.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <span class="label">Fuse length</span>
+    <div class="seg" role="group" aria-label="Fuse length">
+      <button data-fuse="short" aria-pressed="false">Short</button>
+      <button data-fuse="medium" aria-pressed="true">Medium</button>
+      <button data-fuse="long" aria-pressed="false">Long</button>
+    </div>
+    <div class="toggle"><input id="useLetter" type="checkbox"><label for="useLetter">Harder: answers must start with a given letter</label></div>
+    <div class="toggle"><input id="useSound" type="checkbox" checked><label for="useSound">Ticking sound</label></div>
+  </div>
+
+  <button class="btn" id="start">LIGHT THE FUSE</button>
+</section>
+
+<section class="screen" id="play" hidden>
+  <span class="label">Name something in</span>
+  <p class="category" id="category"></p>
+  <div class="letter" id="letter"></div>
+  <svg class="potato wobble" id="potato" viewBox="0 0 200 200" aria-hidden="true">
+    <path d="M118 30c8-14 22-18 30-12" fill="none" stroke="#ffb21a" stroke-width="4" stroke-linecap="round"/>
+    <circle id="spark" cx="150" cy="17" r="7" fill="#ffe27a"/>
+    <path d="M100 38c48-4 78 34 74 78s-34 70-80 68-74-34-70-76 28-66 76-70z" fill="#c8843f"/>
+    <path d="M100 38c48-4 78 34 74 78-30 10-120 14-148-6 4-42 28-66 74-72z" fill="#d99550" opacity=".6"/>
+    <circle cx="70" cy="90" r="4" fill="#8a5426"/><circle cx="130" cy="78" r="3" fill="#8a5426"/>
+    <circle cx="140" cy="140" r="4" fill="#8a5426"/><circle cx="82" cy="148" r="3" fill="#8a5426"/>
+    <circle cx="108" cy="112" r="3" fill="#8a5426"/>
+  </svg>
+  <p class="hint">Say one, then pass the phone.</p>
+  <div class="row">
+    <button class="btn ghost" id="skip">New category</button>
+    <button class="btn ghost" id="quit">Stop</button>
+  </div>
+</section>
+
+<section class="screen" id="boom" hidden>
+  <h2>BOOM!</h2>
+  <p>Whoever's holding the phone loses this round.</p>
+  <p id="boomCat" style="opacity:.8;font-size:1rem"></p>
+  <button class="btn" id="again">NEXT ROUND</button>
+  <button class="btn ghost" id="menu">Change settings</button>
+</section>
+
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const CATEGORIES=["Fruits","Vegetables","Animals","Countries","Capital cities","Sports","Board games","Musical instruments","Things in a kitchen","Things in a bathroom","Things at the beach","Things in a school","Jobs","Car brands","Colours","Breakfast foods","Desserts","Drinks","Cheeses","Pizza toppings","Things that are cold","Things that are round","Things that are yellow","Things with wheels","Things that fly","Things you can wear","Things in a toolbox","Things in a supermarket","Body parts","Famous landmarks","Movies","TV shows","Cartoon characters","Superheroes","Band names","Song titles","Dog breeds","Birds","Sea creatures","Insects","Flowers","Trees","Herbs and spices","Languages","Rivers","Mountains","Planets and space things","Weather words","Things in a garden","Things in an office","Hobbies","Dances","Olympic events","Football clubs","Things at a wedding","Things at a birthday party","Things at an airport","Things in a hospital","Camping gear","Things that make noise","Things that smell good","Things that are sticky","Things you plug in","Apps","Board game pieces","Fairy tales","Christmas things","Halloween things","Toys","Shoes","Hats","Things made of wood","Things made of glass","Pasta shapes","Sandwich fillings","Kitchen appliances","Furniture","Emotions","Things that are hot","Ways to travel","Shops on a high street","Things in a museum","Words that rhyme with cat","Words ending in -ing","Famous scientists","Magic words and spells","Things you find in a pocket","Excuses for being late"];
+  const LETTERS="ABCDEFGHILMNOPRSTW";
+  const FUSES={short:[12,25],medium:[20,45],long:[35,75]};
+  let fuse='medium', deadline=0, startedAt=0, raf=0, nextTick=0, audio=null, wake=null, lastCat='';
+
+  document.querySelectorAll('[data-fuse]').forEach(b=>b.onclick=()=>{
+    fuse=b.dataset.fuse;
+    document.querySelectorAll('[data-fuse]').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  });
+
+  function show(id){['setup','play','boom'].forEach(s=>$(s).hidden=s!==id);}
+  const pick=a=>a[Math.floor(Math.random()*a.length)];
+
+  function newPrompt(){
+    let c; do{c=pick(CATEGORIES);}while(c===lastCat);
+    lastCat=c; $('category').textContent=c;
+    $('letter').textContent=$('useLetter').checked?'starting with '+pick(LETTERS):'';
+  }
+
+  function ensureAudio(){
+    if(!audio){try{audio=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}}
+    if(audio&&audio.state==='suspended') audio.resume();
+  }
+  function beep(freq,dur,vol,type){
+    if(!audio||!$('useSound').checked) return;
+    const t=audio.currentTime, o=audio.createOscillator(), g=audio.createGain();
+    o.type=type||'square'; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t+dur);
+  }
+  function explosion(){
+    if(!audio||!$('useSound').checked) return;
+    const len=audio.sampleRate*1.2, buf=audio.createBuffer(1,len,audio.sampleRate), d=buf.getChannelData(0);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.5);
+    const s=audio.createBufferSource(), f=audio.createBiquadFilter(), g=audio.createGain();
+    s.buffer=buf; f.type='lowpass'; f.frequency.value=900; g.gain.value=0.9;
+    s.connect(f).connect(g).connect(audio.destination); s.start();
+  }
+
+  function loop(now){
+    const total=deadline-startedAt, left=deadline-now, p=Math.min(1,Math.max(0,1-left/total));
+    // Tick interval shrinks from ~900ms to ~120ms as the fuse burns.
+    const interval=900-780*Math.pow(p,1.4);
+    if(now>=nextTick){ beep(p<0.85?880:1320,0.05,0.25); nextTick=now+interval; $('spark').setAttribute('r',p<0.85?7:10); }
+    $('potato').style.setProperty('--speed',Math.max(.12,interval/1000*1.2)+'s');
+    $('play').style.backgroundColor=`color-mix(in srgb, var(--bg) ${Math.round(100-p*45)}%, var(--hot))`;
+    if(left<=0){ return boom(); }
+    raf=requestAnimationFrame(loop);
+  }
+
+  async function startRound(){
+    ensureAudio(); newPrompt(); show('play');
+    const [lo,hi]=FUSES[fuse];
+    startedAt=performance.now(); deadline=startedAt+(lo+Math.random()*(hi-lo))*1000; nextTick=startedAt;
+    cancelAnimationFrame(raf); raf=requestAnimationFrame(loop);
+    if(!wake){ try{ wake=await navigator.wakeLock.request('screen'); wake.addEventListener('release',()=>wake=null); }catch(e){} }
+  }
+  function boom(){
+    cancelAnimationFrame(raf); explosion();
+    try{ navigator.vibrate&&navigator.vibrate([400,100,400]); }catch(e){}
+    $('boomCat').textContent='Category: '+lastCat+($('letter').textContent?' '+$('letter').textContent:'');
+    $('play').style.backgroundColor=''; show('boom');
+    $('boom').classList.remove('shake'); void $('boom').offsetWidth; $('boom').classList.add('shake');
+  }
+  function toMenu(){ cancelAnimationFrame(raf); $('play').style.backgroundColor=''; show('setup'); try{wake&&wake.release();}catch(e){} wake=null; }
+
+  $('start').onclick=startRound;
+  $('again').onclick=startRound;
+  $('skip').onclick=newPrompt;
+  $('quit').onclick=toMenu;
+  $('menu').onclick=toMenu;
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden && !$('play').hidden) toMenu(); });
+
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
