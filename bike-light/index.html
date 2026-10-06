@@ -44,13 +44,13 @@ input[type=range]{width:100%;accent-color:var(--red)}
 <div class="wrap">
   <header>
     <h1>Bike <span>Light</span></h1>
-    <p class="sub">Flashes your phone's torch and screen together. Chrome on Android.</p>
+    <p class="sub">Turn your screen brightness to full and mount your phone with the screen facing behind you. The red screen flashes backwards and the torch shines ahead.</p>
   </header>
 
   <section class="card">
     <div class="row"><label for="rate">Flash rate</label><span class="rate" id="rateOut">2.0 Hz</span></div>
-    <input id="rate" type="range" min="0.5" max="3" step="0.5" value="2">
-    <div class="ticks"><span>0.5</span><span>1</span><span>1.5</span><span>2</span><span>2.5</span><span>3 Hz</span></div>
+    <input id="rate" type="range" min="1" max="3" step="0.5" value="2">
+    <div class="ticks"><span>1</span><span>1.5</span><span>2</span><span>2.5</span><span>3 Hz</span></div>
 
     <div>
       <label style="display:block;margin-bottom:8px">Pattern</label>
@@ -67,7 +67,7 @@ input[type=range]{width:100%;accent-color:var(--red)}
   <button class="go" id="go">START</button>
   <div class="status" id="status" role="status">Torch not started yet.</div>
 
-  <p class="note"><strong>Photosensitivity:</strong> the rate is capped at 3 flashes per second, the usual seizure-safety limit. Don't use it around anyone who may be photosensitive.</p>
+  <p class="note"><strong>Emergency use only.</strong> Bike Light is not a bicycle lamp and does not meet the legal requirements for cycle lighting. Use it only when no proper lights are available, and only to get yourself home safely. It is provided as is, without any warranty. You use it at your own risk and are responsible for following the laws where you ride. Don't use it near anyone who may be photosensitive.</p>
 </div>
 
 <div id="stage" hidden><p>Tap anywhere to stop</p></div>

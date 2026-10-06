@@ -1,6 +1,6 @@
 // Bike Light offline support.
 // Bump VERSION whenever any file in this folder changes, so phones pick up the update.
-const VERSION = 'bike-light-v1';
+const VERSION = 'bike-light-v2';
 const FONT_CACHE = 'bike-light-fonts';
 const PRECACHE = [
   './',
